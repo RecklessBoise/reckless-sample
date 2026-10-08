@@ -58,14 +58,14 @@ namespace
 bool RenderParams::operator== (const RenderParams& o) const
 {
     return sample == o.sample && chopStarts == o.chopStarts && nearlyEqual (outputSampleRate, o.outputSampleRate)
-        && nearlyEqual (pitchSemitones, o.pitchSemitones) && keepSpeed == o.keepSpeed && nearlyEqual (speed, o.speed)
+        && nearlyEqual (pitchSemitones, o.pitchSemitones) && keepSpeed == o.keepSpeed && nearlyEqual (duration, o.duration)
         && syncMode == o.syncMode && nearlyEqual (sampleBpm, o.sampleBpm, 0.005)
         && (syncMode == SyncMode::off || nearlyEqual (targetBpm, o.targetBpm, 0.005)) && reverse == o.reverse;
 }
 
 double RenderParams::tempoFactor() const
 {
-    double factor = speed;
+    double factor = 1.0 / juce::jlimit (0.05f, 20.0f, duration);
     if (syncMode != SyncMode::off && sampleBpm > 0.0 && targetBpm > 0.0)
         factor *= targetBpm / sampleBpm;
     return juce::jlimit (0.05, 20.0, factor);

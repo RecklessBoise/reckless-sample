@@ -66,42 +66,43 @@ void PadGrid::Pad::paint (juce::Graphics& g)
     // Halo.
     if (lit > 0.01f)
     {
-        g.setColour (theme::cyan.withAlpha (0.18f * lit));
+        g.setColour (theme::accent.withAlpha (0.18f * lit));
         g.fillRoundedRectangle (r.expanded (3.0f), 12.0f);
     }
 
-    // Glass body; the light rises from the bottom like the photo's lit dots.
+    // Glass body; the light rises from the bottom like the glow on the CRT.
     g.setGradientFill (juce::ColourGradient (theme::abyss.withAlpha (0.92f), r.getX(), r.getY(),
-                                             theme::deepTeal.interpolatedWith (theme::cyan, lit * 0.6f).withAlpha (0.92f),
+                                             theme::deep.interpolatedWith (theme::accent, lit * 0.6f).withAlpha (0.92f),
                                              r.getX(), r.getBottom(), false));
     g.fillRoundedRectangle (r, 10.0f);
 
-    // Dotted rows inside the pad brighten with the level.
+    // Vertical RGB phosphor lines brighten with the level.
     g.saveState();
     g.reduceClipRegion (r.reduced (6.0f).toNearestInt());
-    for (float y = r.getY() + 8.0f; y < r.getBottom() - 4.0f; y += 5.0f)
+    const juce::Colour stripes[] { theme::accent, theme::phosphor, theme::violet };
+    int column = 0;
+    for (float x = r.getX() + 6.0f; x < r.getRight() - 4.0f; x += 2.0f, ++column)
     {
-        const float rowLight = 0.08f + lit * 0.7f * (y - r.getY()) / r.getHeight();
-        g.setColour (theme::ice.withAlpha (rowLight * 0.35f));
-        for (float x = r.getX() + 6.0f + std::fmod (y, 2.0f); x < r.getRight() - 4.0f; x += 4.0f)
-            g.fillRect (x, y, 1.6f, 1.2f);
+        g.setGradientFill (juce::ColourGradient (stripes[column % 3].withAlpha (0.04f + lit * 0.05f), x, r.getY(),
+                                                 stripes[column % 3].withAlpha (0.1f + lit * 0.45f), x, r.getBottom(), false));
+        g.fillRect (x, r.getY(), 1.0f, r.getHeight());
     }
     g.restoreState();
 
-    g.setColour (pressed || lit > 0.05f ? theme::cyan.withAlpha (0.5f + 0.5f * lit) : theme::outline);
+    g.setColour (pressed || lit > 0.05f ? theme::accent.withAlpha (0.5f + 0.5f * lit) : theme::outline);
     g.drawRoundedRectangle (r, 10.0f, pressed ? 1.6f : 1.0f);
 
-    g.setColour (lit > 0.3f ? theme::ice : theme::text);
+    g.setColour (lit > 0.3f ? theme::highlight : theme::text);
     g.setFont (theme::font (22.0f, true));
     g.drawText (juce::String (index + 1), r.reduced (12.0f, 8.0f), juce::Justification::topLeft);
 
-    g.setColour (theme::textDim.interpolatedWith (theme::ice, lit));
+    g.setColour (theme::textDim.interpolatedWith (theme::highlight, lit));
     g.setFont (theme::caption (11.0f));
     g.drawText (juce::String::charToString ((juce::juce_wchar) keys[index]), r.reduced (12.0f, 10.0f), juce::Justification::bottomRight);
 
     if (latched)
     {
-        g.setColour (theme::ice);
+        g.setColour (theme::highlight);
         g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ r.getRight() - 14.0f, r.getY() + 14.0f }));
     }
 }

@@ -72,6 +72,16 @@ public:
     double getHostBpm() const { return hostBpm.load(); }
     bool isHostPlaying() const { return hostPlaying.load(); }
     double getEffectiveTargetBpm() const;
+
+    /** Tempo used by tempo-synced Length and the delay: DAW tempo, else the manual or sample tempo. */
+    double getGrooveBpm() const;
+
+    /** Seconds of one Length note value at the current tempo. */
+    double getLengthDivisionSeconds() const;
+
+    /** For the waveform: fraction of each chop that is heard, and the rendered duration of the whole sample. */
+    std::array<float, rs::numChops> getAudibleFractions() const;
+    double getRenderedSampleSeconds() const;
     bool isRendering() const { return rendering.load(); }
 
     juce::AudioProcessorValueTreeState apvts;
@@ -79,7 +89,8 @@ public:
     rs::FxChain fx;
     std::unique_ptr<rs::PresetManager> presetManager;
 
-    juce::Point<int> editorSize { 1000, 640 };
+    /** UI zoom (1 = 100%). Only changed by the user, never by the host's own window sizing. */
+    std::atomic<float> uiScale { 1.0f };
 
     /** Errors raised while restoring a session (missing files), shown by the editor. */
     void reportError (const juce::String& message);

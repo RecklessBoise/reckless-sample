@@ -19,11 +19,12 @@ void WaveformView::setChops (const ChopStarts& newChops)
     repaint();
 }
 
-void WaveformView::setPlayback (const std::array<float, numChops>& newPositions, const std::array<float, numChops>& newLevels, float lengthFraction)
+void WaveformView::setPlayback (const std::array<float, numChops>& newPositions, const std::array<float, numChops>& newLevels,
+                                const std::array<float, numChops>& audibleFractions)
 {
     positions = newPositions;
     levels = newLevels;
-    length = lengthFraction;
+    audible = audibleFractions;
     repaint();
 }
 
@@ -90,14 +91,14 @@ void WaveformView::paint (juce::Graphics& g)
         const float x0 = xFor (chops[(size_t) i]), x1 = xFor (chopEnd (i));
         if (levels[(size_t) i] > 0.001f)
         {
-            g.setGradientFill (juce::ColourGradient (theme::cyan.withAlpha (0.22f * levels[(size_t) i]), x0, midY,
-                                                     theme::cyan.withAlpha (0.02f), x1, midY, false));
+            g.setGradientFill (juce::ColourGradient (theme::accent.withAlpha (0.22f * levels[(size_t) i]), x0, midY,
+                                                     theme::accent.withAlpha (0.02f), x1, midY, false));
             g.fillRect (juce::Rectangle<float> (x0, area.getY(), x1 - x0, area.getHeight()));
         }
         // Dim the part of each chop cut off by the Length control.
-        if (length < 0.999f)
+        if (audible[(size_t) i] < 0.999f)
         {
-            const float cut = x0 + (x1 - x0) * length;
+            const float cut = x0 + (x1 - x0) * audible[(size_t) i];
             g.setColour (theme::black.withAlpha (0.45f));
             g.fillRect (juce::Rectangle<float> (cut, area.getY(), x1 - cut, area.getHeight()));
         }
@@ -110,9 +111,9 @@ void WaveformView::paint (juce::Graphics& g)
         const float x = area.getX() + (float) c;
         wave.addLineSegment ({ x, midY - peaks[c].second * halfH, x, midY - peaks[c].first * halfH }, 1.0f);
     }
-    g.setColour (theme::cyan.withAlpha (0.12f));
+    g.setColour (theme::accent.withAlpha (0.12f));
     g.strokePath (wave, juce::PathStrokeType (3.0f));
-    g.setGradientFill (juce::ColourGradient (theme::ice, 0.0f, area.getY(), theme::teal, 0.0f, midY + halfH, false));
+    g.setGradientFill (juce::ColourGradient (theme::highlight, 0.0f, area.getY(), theme::violet, 0.0f, midY + halfH, false));
     g.fillPath (wave);
 
     // Chop markers with their number and key.
@@ -121,7 +122,7 @@ void WaveformView::paint (juce::Graphics& g)
     {
         const float x = xFor (chops[(size_t) i]);
         const bool active = dragging == i || hover == i;
-        g.setColour (active ? theme::ice : theme::cyan.withAlpha (0.45f));
+        g.setColour (active ? theme::highlight : theme::accent.withAlpha (0.45f));
         g.drawLine (x, area.getY() - 4.0f, x, area.getBottom(), active ? 1.5f : 1.0f);
 
         juce::Path handle;
@@ -129,7 +130,7 @@ void WaveformView::paint (juce::Graphics& g)
         g.fillPath (handle);
 
         g.setFont (theme::caption (9.5f));
-        g.setColour (levels[(size_t) i] > 0.01f ? theme::ice : theme::textDim);
+        g.setColour (levels[(size_t) i] > 0.01f ? theme::highlight : theme::textDim);
         g.drawText (juce::String (i + 1) + " " + juce::String::charToString ((juce::juce_wchar) keys[i]),
                     juce::Rectangle<float> (x + 9.0f, area.getY() - 20.0f, 40.0f, 14.0f), juce::Justification::centredLeft);
     }
@@ -141,16 +142,16 @@ void WaveformView::paint (juce::Graphics& g)
         if (pos < 0.0f)
             continue;
         const float x0 = xFor (chops[(size_t) i]), x1 = xFor (chopEnd (i));
-        const float x = x0 + (x1 - x0) * length * pos;
+        const float x = x0 + (x1 - x0) * pos;
         juce::Path head;
         head.startNewSubPath (x, area.getY());
         head.lineTo (x, area.getBottom());
-        theme::strokeGlow (g, head, theme::ice, 1.2f, 8.0f);
+        theme::strokeGlow (g, head, theme::highlight, 1.2f, 8.0f);
     }
 
     if (rendering)
     {
-        g.setColour (theme::cyan.withAlpha (0.8f));
+        g.setColour (theme::accent.withAlpha (0.8f));
         g.setFont (theme::caption (9.5f));
         g.drawText ("RENDERING", getLocalBounds().toFloat().reduced (14.0f, 6.0f).removeFromBottom (14.0f), juce::Justification::centredRight);
     }

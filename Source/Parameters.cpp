@@ -57,6 +57,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
 
     layout.add (std::make_unique<APF> (PID { ParamID::volume, 1 }, "Volume", juce::NormalisableRange<float> (0.0f, 1.5f), 1.0f, percent()),
                 std::make_unique<APF> (PID { ParamID::length, 1 }, "Length", juce::NormalisableRange<float> (0.05f, 1.0f), 1.0f, multiplier()),
+                std::make_unique<APB> (PID { ParamID::lengthSync, 1 }, "Length Sync", false),
+                std::make_unique<APC> (PID { ParamID::lengthDiv, 1 }, "Length Division", lengthDivisionNames, 6),
                 std::make_unique<APF> (PID { ParamID::attack, 1 }, "Attack", skewedRange (0.0f, 2000.0f, 80.0f), 2.0f, withSuffix (" ms", 0)),
                 std::make_unique<APF> (PID { ParamID::release, 1 }, "Release", skewedRange (1.0f, 4000.0f, 200.0f), 40.0f, withSuffix (" ms", 0)),
                 std::make_unique<APB> (PID { ParamID::latch, 1 }, "Latch", false),
@@ -67,7 +69,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     layout.add (std::make_unique<APF> (PID { ParamID::pitch, 1 }, "Pitch", juce::NormalisableRange<float> (-24.0f, 24.0f, 1.0f), 0.0f, semitones()),
                 std::make_unique<APF> (PID { ParamID::fine, 1 }, "Fine", juce::NormalisableRange<float> (-100.0f, 100.0f, 1.0f), 0.0f, withSuffix (" ct", 0)),
                 std::make_unique<APB> (PID { ParamID::keepSpeed, 1 }, "Keep Speed", true),
-                std::make_unique<APF> (PID { ParamID::speed, 1 }, "Speed", skewedRange (0.25f, 4.0f, 1.0f), 1.0f, multiplier()),
+                std::make_unique<APF> (PID { ParamID::duration, 1 }, "Duration", skewedRange (0.25f, 4.0f, 1.0f), 1.0f, multiplier()),
                 std::make_unique<APC> (PID { ParamID::syncMode, 1 }, "Tempo Sync", juce::StringArray { "Off", "DAW", "Manual" }, 0),
                 std::make_unique<APF> (PID { ParamID::sampleBpm, 1 }, "Sample BPM", juce::NormalisableRange<float> (40.0f, 250.0f, 0.01f), 120.0f, withSuffix (" bpm", 2)),
                 std::make_unique<APF> (PID { ParamID::manualBpm, 1 }, "Target BPM", juce::NormalisableRange<float> (40.0f, 250.0f, 0.01f), 120.0f, withSuffix (" bpm", 2)));
@@ -90,8 +92,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
 const juce::StringArray& allParameterIds()
 {
     static const juce::StringArray ids {
-        ParamID::volume, ParamID::length, ParamID::attack, ParamID::release, ParamID::latch, ParamID::clickFree,
-        ParamID::reverse, ParamID::chopMode, ParamID::pitch, ParamID::fine, ParamID::keepSpeed, ParamID::speed,
+        ParamID::volume, ParamID::length, ParamID::lengthSync, ParamID::lengthDiv, ParamID::attack, ParamID::release, ParamID::latch, ParamID::clickFree,
+        ParamID::reverse, ParamID::chopMode, ParamID::pitch, ParamID::fine, ParamID::keepSpeed, ParamID::duration,
         ParamID::syncMode, ParamID::sampleBpm, ParamID::manualBpm, ParamID::filterType, ParamID::cutoff,
         ParamID::resonance, ParamID::drive, ParamID::crush, ParamID::chorusMix, ParamID::delayMix,
         ParamID::delayTime, ParamID::delayFb, ParamID::reverbMix, ParamID::reverbSize

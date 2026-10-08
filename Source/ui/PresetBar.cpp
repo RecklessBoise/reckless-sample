@@ -9,14 +9,14 @@ void HeartButton::paintButton (juce::Graphics& g, bool highlighted, bool)
     const auto heart = theme::heartPath (area);
     if (getToggleState())
     {
-        g.setColour (theme::cyan.withAlpha (0.35f));
+        g.setColour (theme::accent.withAlpha (0.35f));
         g.fillPath (theme::heartPath (area.expanded (3.0f)));
         g.setColour (theme::heart);
         g.fillPath (heart);
     }
     else
     {
-        g.setColour (highlighted ? theme::cyan : theme::textDim);
+        g.setColour (highlighted ? theme::accent : theme::textDim);
         g.strokePath (heart, juce::PathStrokeType (1.5f));
     }
 }

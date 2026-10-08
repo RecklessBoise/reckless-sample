@@ -13,7 +13,7 @@ struct RenderParams
     double outputSampleRate = 44100.0;
     float pitchSemitones = 0.0f;  // pitch + fine
     bool keepSpeed = true;        // true: pitch without changing duration
-    float speed = 1.0f;           // user speed multiplier
+    float duration = 1.0f;        // user duration multiplier: 2 = twice as long, same pitch
     SyncMode syncMode = SyncMode::off;
     double sampleBpm = 120.0;
     double targetBpm = 120.0;     // host or manual tempo, used when syncing
@@ -22,7 +22,7 @@ struct RenderParams
     bool operator== (const RenderParams& other) const;
     bool operator!= (const RenderParams& other) const { return ! (*this == other); }
 
-    /** Factor applied to playback speed by tempo (speed x sync ratio). */
+    /** Factor applied to playback speed (1 / duration x sync ratio). */
     double tempoFactor() const;
 
     /** Output duration divided by source duration. */

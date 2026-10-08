@@ -143,14 +143,14 @@ void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int width, int
 
     if (selected)
     {
-        g.setColour (theme::deepTeal.withAlpha (0.9f));
+        g.setColour (theme::deep.withAlpha (0.9f));
         g.fillRoundedRectangle (r, 6.0f);
-        g.setColour (theme::cyan.withAlpha (0.5f));
+        g.setColour (theme::accent.withAlpha (0.5f));
         g.drawRoundedRectangle (r, 6.0f, 1.0f);
     }
 
     auto text = r.reduced (10.0f, 0.0f).withTrimmedRight ((float) heartWidth);
-    g.setColour (selected ? theme::ice : theme::text);
+    g.setColour (selected ? theme::highlight : theme::text);
     g.setFont (theme::font (13.0f, selected));
     g.drawText (p.name, text.removeFromLeft (text.getWidth() * 0.72f), juce::Justification::centredLeft, true);
     g.setColour (theme::textDim);

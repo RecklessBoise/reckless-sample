@@ -6,10 +6,13 @@
 namespace rs
 {
 /**
-    Animated background in the style of the reference photo: rows of light dots
-    seen through a blurred lens, with drifting cyan light. Playing a chop sends a
-    flare across the field, the rows ripple with the output level, and a bright
-    scan line sweeps through on each new hit.
+    Animated background in the style of the reference photo: a filmed CRT/VHS
+    screen with vertical RGB phosphor lines, grey-teal light, a magenta band at
+    the bottom, a violet block glowing in the dark top-right corner.
+
+    It reacts to playback: each hit flashes a coloured flare above its pad and
+    tears a band of lines sideways (VHS glitch), the colour channels drift
+    apart with the output level, and a tracking band rolls down the screen.
 */
 class LightField : public juce::Component
 {
@@ -23,21 +26,29 @@ public:
     void resized() override;
 
 private:
+    void renderField();
     void renderFrame();
 
     struct Flare
     {
-        float x = 0.5f, y = 0.5f, energy = 0.0f;
+        float x = 0.5f, y = 0.6f, energy = 0.0f;
+        juce::Colour colour;
+    };
+
+    struct Tear
+    {
+        float y = 0.0f, height = 0.0f, offset = 0.0f;
+        int frames = 0;
     };
 
     juce::Image frame;
-    std::array<juce::PixelARGB, 256> palette;
-    std::vector<float> field;
+    std::array<std::vector<float>, 3> field; // coarse light, one grid per colour channel
     int fieldW = 0, fieldH = 0;
 
     std::array<Flare, numChops> flares;
     std::array<float, numChops> previousPad {};
-    float level = 0.0f, scan = -1.0f, time = 0.0f;
+    std::array<Tear, 3> tears;
+    float level = 0.0f, time = 0.0f, tracking = 0.0f, hitFlash = 0.0f;
     juce::Random random { 42 };
 };
 } // namespace rs

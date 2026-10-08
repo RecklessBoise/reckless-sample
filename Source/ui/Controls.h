@@ -27,7 +27,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         const bool showValue = slider.isMouseOverOrDragging();
-        g.setColour (showValue ? theme::ice : theme::textDim);
+        g.setColour (showValue ? theme::highlight : theme::textDim);
         g.setFont (showValue ? theme::font (11.0f, true) : theme::caption (9.5f));
         g.drawText (showValue ? slider.getTextFromValue (slider.getValue()) : name,
                     getLocalBounds().removeFromBottom (16), juce::Justification::centred, false);

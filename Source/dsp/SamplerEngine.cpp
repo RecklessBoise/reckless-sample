@@ -37,12 +37,26 @@ void SamplerEngine::configureEnvelope (Voice& voice, const VoiceSettings& s) con
     voice.envelope.setParameters (p);
 }
 
-int SamplerEngine::playableLength (int chop, const RenderSet* set, const VoiceSettings& s) const
+SamplerEngine::Region SamplerEngine::regionFor (int chop, const RenderSet* set, const VoiceSettings& s) const
 {
+    Region r;
     if (set == nullptr)
-        return 0;
-    const int full = set->chops[(size_t) chop].getNumSamples();
-    return full <= 0 ? 0 : juce::jlimit (1, full, (int) std::round ((float) full * s.length));
+        return r;
+    r.full = set->chops[(size_t) chop].getNumSamples();
+    if (r.full <= 0)
+        return r;
+
+    if (s.lengthSamples > 0)
+    {
+        // Tempo-synced: the pass lasts one note value; shorter chops are followed by silence.
+        r.period = s.lengthSamples;
+        r.audible = juce::jmin (r.full, r.period);
+    }
+    else
+    {
+        r.period = r.audible = juce::jlimit (1, r.full, (int) std::round ((float) r.full * s.length));
+    }
+    return r;
 }
 
 void SamplerEngine::beginCrossfade (Voice& voice, const RenderSet::Ptr& fromSet)
@@ -166,13 +180,15 @@ void SamplerEngine::render (juce::AudioBuffer<float>& output, int startSample, i
             configureEnvelope (v, s);
 
         const auto* set = renderSet.get();
-        const int length = playableLength (chop, set, s);
-        const int edge = s.clickFree ? juce::jmin (length / 4, (int) (sampleRate * 0.003)) : 0;
+        const auto region = regionFor (chop, set, s);
+        const int length = region.period;
+        const int audible = region.audible;
+        const int edge = s.clickFree ? juce::jmin (audible / 4, (int) (sampleRate * 0.003)) : 0;
         const float* srcL = length > 0 ? set->chops[(size_t) chop].getReadPointer (0) : nullptr;
         const float* srcR = length > 0 ? set->chops[(size_t) chop].getReadPointer (1) : nullptr;
 
         const auto* fadeSet = v.fadeSet.get();
-        const int fadeLength = fadeSet != nullptr ? playableLength (chop, fadeSet, s) : 0;
+        const int fadeLength = fadeSet != nullptr ? regionFor (chop, fadeSet, s).audible : 0;
         const float* fadeL = fadeLength > 0 ? fadeSet->chops[(size_t) chop].getReadPointer (0) : nullptr;
         const float* fadeR = fadeLength > 0 ? fadeSet->chops[(size_t) chop].getReadPointer (1) : nullptr;
 
@@ -193,19 +209,27 @@ void SamplerEngine::render (juce::AudioBuffer<float>& output, int startSample, i
                     const int p = juce::jlimit (0, length - 1, (int) v.position);
                     const float env = v.envelope.getNextSample();
                     v.lastEnvelope = env;
-                    float g = env * v.gain;
-                    if (edge > 0)
-                        g *= juce::jmin (1.0f, (float) juce::jmin (p + 1, length - p) / (float) edge);
-                    if (v.fadeIn && v.fadeRemaining > 0)
-                        g *= 1.0f - xfade;
-                    l = srcL[p] * g;
-                    r = srcR[p] * g;
-                    peak = juce::jmax (peak, env * v.gain);
+                    if (p < audible)
+                    {
+                        float g = env * v.gain;
+                        if (edge > 0)
+                            g *= juce::jmin (1.0f, (float) juce::jmin (p + 1, audible - p) / (float) edge);
+                        if (v.fadeIn && v.fadeRemaining > 0)
+                            g *= 1.0f - xfade;
+                        l = srcL[p] * g;
+                        r = srcR[p] * g;
+                        peak = juce::jmax (peak, env * v.gain);
+                    }
 
                     v.position += 1.0;
-                    if (v.position >= length)
+                    const bool looping = v.held || v.latched || v.releasing;
+                    if (! looping && v.position >= audible)
                     {
-                        if (v.held || v.latched || v.releasing)
+                        v.active = false; // a tap stops when the audio runs out
+                    }
+                    else if (v.position >= length)
+                    {
+                        if (looping)
                         {
                             v.position -= length;
                             ++v.passes;
@@ -250,7 +274,7 @@ void SamplerEngine::render (juce::AudioBuffer<float>& output, int startSample, i
             v.fadeSet = nullptr; // the processor keeps a reference, so this never frees on the audio thread
 
         padLevel[(size_t) chop] = v.active ? peak : 0.0f;
-        padPosition[(size_t) chop] = v.active && length > 0 ? (float) (v.position / length) : -1.0f;
+        padPosition[(size_t) chop] = v.active && region.full > 0 ? (float) juce::jmin (1.0, v.position / region.full) : -1.0f;
         if (! v.active)
         {
             v.latched = false;

@@ -8,6 +8,7 @@ namespace rs
 struct VoiceSettings
 {
     float length = 1.0f;     // fraction of each chop that plays
+    int lengthSamples = 0;   // > 0 when Length is synced to the tempo: each pass lasts exactly this long
     float attackMs = 2.0f;
     float releaseMs = 40.0f;
     bool latch = false;
@@ -66,7 +67,9 @@ private:
     void startVoice (int chop, float velocity, const VoiceSettings&);
     void beginCrossfade (Voice& voice, const RenderSet::Ptr& fromSet);
     void configureEnvelope (Voice& voice, const VoiceSettings&) const;
-    int playableLength (int chop, const RenderSet* set, const VoiceSettings&) const;
+    /** period: samples between loop restarts; audible: samples of chop audio inside a period. */
+    struct Region { int period = 0, audible = 0, full = 0; };
+    Region regionFor (int chop, const RenderSet* set, const VoiceSettings&) const;
 
     std::array<Voice, numChops> voices;
     RenderSet::Ptr renderSet;

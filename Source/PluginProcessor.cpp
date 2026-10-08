@@ -12,8 +12,7 @@ const juce::Identifier editorTag { "Editor" };
 const juce::Identifier presetTag { "CurrentPreset" };
 const juce::Identifier chopsAttr { "chops" };
 const juce::Identifier chopModeAttr { "chopMode" };
-const juce::Identifier widthAttr { "width" };
-const juce::Identifier heightAttr { "height" };
+const juce::Identifier scaleAttr { "scale" };
 const juce::Identifier idAttr { "id" };
 
 constexpr int whiteKeyNotes[numChops] { 60, 62, 64, 65, 67, 69, 71, 72 };
@@ -160,6 +159,8 @@ VoiceSettings RecklessSampleProcessor::voiceSettings() const
 {
     VoiceSettings s;
     s.length = param (ParamID::length);
+    if (param (ParamID::lengthSync) > 0.5f && currentSampleRate.load() > 0.0)
+        s.lengthSamples = juce::jmax (16, (int) std::round (getLengthDivisionSeconds() * currentSampleRate.load()));
     s.attackMs = param (ParamID::attack);
     s.releaseMs = param (ParamID::release);
     s.latch = param (ParamID::latch) > 0.5f;
@@ -182,7 +183,7 @@ FxSettings RecklessSampleProcessor::fxSettings() const
     s.delayFeedback = param (ParamID::delayFb);
     s.reverbMix = param (ParamID::reverbMix);
     s.reverbSize = param (ParamID::reverbSize);
-    s.bpm = hostBpm > 0.0 ? hostBpm.load() : (double) param (ParamID::manualBpm);
+    s.bpm = getGrooveBpm();
     return s;
 }
 
@@ -293,12 +294,53 @@ RenderParams RecklessSampleProcessor::makeRenderParams() const
     p.outputSampleRate = currentSampleRate.load();
     p.pitchSemitones = param (ParamID::pitch) + param (ParamID::fine) / 100.0f;
     p.keepSpeed = param (ParamID::keepSpeed) > 0.5f;
-    p.speed = param (ParamID::speed);
+    p.duration = param (ParamID::duration);
     p.syncMode = (SyncMode) juce::roundToInt (param (ParamID::syncMode));
     p.sampleBpm = param (ParamID::sampleBpm);
     p.targetBpm = getEffectiveTargetBpm();
     p.reverse = param (ParamID::reverse) > 0.5f;
     return p;
+}
+
+double RecklessSampleProcessor::getGrooveBpm() const
+{
+    if (hostBpm.load() > 0.0)
+        return hostBpm.load();
+    const auto mode = (SyncMode) juce::roundToInt (param (ParamID::syncMode));
+    return mode == SyncMode::manual ? param (ParamID::manualBpm) : param (ParamID::sampleBpm);
+}
+
+double RecklessSampleProcessor::getLengthDivisionSeconds() const
+{
+    const int index = juce::jlimit (0, (int) std::size (lengthDivisionsInBeats) - 1, juce::roundToInt (param (ParamID::lengthDiv)));
+    return lengthDivisionsInBeats[index] * 60.0 / juce::jlimit (20.0, 400.0, getGrooveBpm());
+}
+
+std::array<float, numChops> RecklessSampleProcessor::getAudibleFractions() const
+{
+    std::array<float, numChops> fractions;
+    fractions.fill (param (ParamID::length));
+    if (param (ParamID::lengthSync) < 0.5f)
+        return fractions;
+
+    const auto p = makeRenderParams();
+    if (p.sample == nullptr)
+        return fractions;
+    const auto starts = sanitiseChops (p.chopStarts);
+    const double total = p.sample->getLengthSeconds() * p.durationFactor();
+    const double division = getLengthDivisionSeconds();
+    for (int i = 0; i < numChops; ++i)
+    {
+        const double chopSeconds = ((i + 1 < numChops ? starts[(size_t) i + 1] : 1.0f) - starts[(size_t) i]) * total;
+        fractions[(size_t) i] = chopSeconds > 0.0 ? (float) juce::jmin (1.0, division / chopSeconds) : 1.0f;
+    }
+    return fractions;
+}
+
+double RecklessSampleProcessor::getRenderedSampleSeconds() const
+{
+    const auto p = makeRenderParams();
+    return p.sample != nullptr ? p.sample->getLengthSeconds() * p.durationFactor() : 0.0;
 }
 
 double RecklessSampleProcessor::getEffectiveTargetBpm() const
@@ -504,8 +546,7 @@ void RecklessSampleProcessor::getStateInformation (juce::MemoryBlock& destData)
     state.appendChild (getSampleState(), nullptr);
 
     juce::ValueTree editor (editorTag);
-    editor.setProperty (widthAttr, editorSize.x, nullptr);
-    editor.setProperty (heightAttr, editorSize.y, nullptr);
+    editor.setProperty (scaleAttr, uiScale.load(), nullptr);
     state.appendChild (editor, nullptr);
 
     juce::ValueTree preset (presetTag);
@@ -528,7 +569,7 @@ void RecklessSampleProcessor::setStateInformation (const void* data, int sizeInB
     const auto preset = state.getChildWithName (presetTag);
 
     if (editor.isValid())
-        editorSize = { (int) editor.getProperty (widthAttr, 1000), (int) editor.getProperty (heightAttr, 640) };
+        uiScale = juce::jlimit (0.5f, 2.0f, (float) editor.getProperty (scaleAttr, 1.0f));
 
     for (const auto& tag : { sampleRefTag, editorTag, presetTag })
         state.removeChild (state.getChildWithName (tag), nullptr);

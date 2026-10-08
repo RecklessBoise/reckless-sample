@@ -4,18 +4,20 @@
 
 namespace rs::theme
 {
-// Palette taken from the reference photo: near-black, deep teal, cyan light, icy white.
-inline const juce::Colour black     { 0xff020405 };
-inline const juce::Colour abyss     { 0xff061014 };
-inline const juce::Colour deepTeal  { 0xff0b2a30 };
-inline const juce::Colour teal      { 0xff2a7482 };
-inline const juce::Colour cyan      { 0xff73cfdd };
-inline const juce::Colour ice       { 0xffdcf7ff };
-inline const juce::Colour textDim   { 0xff5d8a93 };
-inline const juce::Colour text      { 0xffc9ecf3 };
-inline const juce::Colour panel     { 0xa8050b0d };
-inline const juce::Colour outline   { 0x2a8fe3f0 };
-inline const juce::Colour heart     { 0xffe8f9ff };
+// Palette taken from the reference photo: a CRT/VHS screen with vertical RGB lines,
+// grey-teal glow, a magenta band and a bright violet block in the dark.
+inline const juce::Colour black     { 0xff07050b };
+inline const juce::Colour abyss     { 0xff120c1a };
+inline const juce::Colour deep      { 0xff2a1838 };
+inline const juce::Colour violet    { 0xff6b3fd6 };
+inline const juce::Colour accent    { 0xffe25fa8 };
+inline const juce::Colour phosphor  { 0xff7ea4a8 };
+inline const juce::Colour highlight { 0xfff4eaff };
+inline const juce::Colour textDim   { 0xff8c8099 };
+inline const juce::Colour text      { 0xffe4dcef };
+inline const juce::Colour panel     { 0xa80a0710 };
+inline const juce::Colour outline   { 0x30c9a7ff };
+inline const juce::Colour heart     { 0xffff7cc0 };
 
 constexpr int baseWidth = 1000;
 constexpr int baseHeight = 640;

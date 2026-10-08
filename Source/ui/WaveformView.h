@@ -15,8 +15,9 @@ public:
     void setSample (SampleData::Ptr sample, const ChopStarts& chops);
     void setChops (const ChopStarts& chops);
 
-    /** Per-frame update: normalised position within each chop (-1 when silent), level, and the Length parameter. */
-    void setPlayback (const std::array<float, numChops>& positions, const std::array<float, numChops>& levels, float lengthFraction);
+    /** Per-frame update: normalised position within each chop (-1 when silent), level, and the fraction of each chop that is heard. */
+    void setPlayback (const std::array<float, numChops>& positions, const std::array<float, numChops>& levels,
+                      const std::array<float, numChops>& audibleFractions);
 
     void setRendering (bool isRendering);
 
@@ -37,7 +38,7 @@ private:
     ChopStarts chops = equalChops();
     std::vector<std::pair<float, float>> peaks;
     std::array<float, numChops> positions {}, levels {};
-    float length = 1.0f;
+    std::array<float, numChops> audible { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
     bool rendering = false;
     int dragging = -1, hover = -1, clickedChop = -1;
 };

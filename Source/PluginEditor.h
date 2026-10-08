@@ -63,11 +63,11 @@ private:
     rs::PadGrid pads;
 
     // Play
-    rs::Knob volume, length, attack, release;
-    rs::Toggle latch, clickFree, reverse;
+    rs::Knob volume, length, lengthDiv, attack, release;
+    rs::Toggle latch, clickFree, reverse, lengthSync;
 
     // Pitch & tempo
-    rs::Knob pitch, fine, speed;
+    rs::Knob pitch, fine, duration;
     rs::Toggle keepSpeed;
     rs::Segmented syncMode;
     rs::NumberBox sampleBpm, targetBpm;
@@ -85,6 +85,9 @@ private:
     std::unique_ptr<juce::FileChooser> fileChooser;
     int lastSampleVersion = -1;
     int toastFrames = 0;
+    int openFrames = 0;          // timer ticks since the editor opened
+    bool scaleFromMenu = false;
+    bool userResized = false;
     std::array<bool, rs::numChops> keyDown {};
 
     juce::Rectangle<int> playPanel, pitchPanel, fxPanel;

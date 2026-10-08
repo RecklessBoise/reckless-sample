@@ -83,6 +83,20 @@ public:
             expectWithinAbsoluteError (dominantFrequency (out, sr), 440.0, 6.0);
         }
 
+        beginTest ("Duration lengthens the sample without changing pitch");
+        {
+            RenderParams p;
+            p.outputSampleRate = sr;
+            p.duration = 2.0f;
+            const auto out = renderRegion (source, 0, source.getNumSamples(), sr, p);
+            expectWithinAbsoluteError (out.getNumSamples(), source.getNumSamples() * 2, 2);
+            expectWithinAbsoluteError (dominantFrequency (out, sr), 440.0, 6.0);
+
+            p.duration = 0.5f;
+            const auto shorter = renderRegion (source, 0, source.getNumSamples(), sr, p);
+            expectWithinAbsoluteError (shorter.getNumSamples(), source.getNumSamples() / 2, 2);
+        }
+
         beginTest ("Sample-rate conversion keeps pitch");
         {
             RenderParams p;
@@ -133,6 +147,40 @@ public:
             engine.noteOn (0, 1.0f, vs);
             engine.render (out, 0, out.getNumSamples(), vs);
             expect (out.getMagnitude (0, chopLength * 2, chopLength / 2) > 0.1f, "hold loops");
+            engine.allNotesOff();
+        }
+
+        beginTest ("Engine: tempo-synced length");
+        {
+            RenderParams p;
+            p.sample = makeSampleData (sine (220.0, 0.8, sr), sr, "sine");
+            p.outputSampleRate = sr;
+            auto set = renderChops (p);
+
+            SamplerEngine engine;
+            engine.prepare (sr);
+            engine.setRenderSet (set);
+            const int chopLength = set->chops[0].getNumSamples();
+            juce::AudioBuffer<float> out (2, chopLength * 4);
+
+            // Shorter than the chop: a tap stops after one note value.
+            VoiceSettings shortNote;
+            shortNote.lengthSamples = chopLength / 2;
+            out.clear();
+            engine.noteOn (0, 1.0f, shortNote);
+            engine.noteOff (0, shortNote);
+            engine.render (out, 0, out.getNumSamples(), shortNote);
+            expect (out.getMagnitude (0, chopLength / 4, chopLength / 8) > 0.1f, "plays the first half");
+            expect (out.getMagnitude (0, chopLength / 2 + 64, chopLength) < 1.0e-4f, "stops at the note value");
+
+            // Longer than the chop: holding loops on the note grid with silence in between.
+            VoiceSettings longNote;
+            longNote.lengthSamples = chopLength * 2;
+            out.clear();
+            engine.noteOn (0, 1.0f, longNote);
+            engine.render (out, 0, out.getNumSamples(), longNote);
+            expect (out.getMagnitude (0, chopLength + 64, chopLength - 128) < 1.0e-4f, "silence after the chop");
+            expect (out.getMagnitude (0, chopLength * 2 + 256, chopLength / 4) > 0.1f, "restarts on the next note");
             engine.allNotesOff();
         }
     }

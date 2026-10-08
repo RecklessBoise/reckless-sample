@@ -52,6 +52,7 @@ int main (int argc, char** argv)
 
     auto shoot = [&] (const juce::String& name, float scale)
     {
+        processor.uiScale = scale; // otherwise the editor restores the remembered zoom
         editor->setSize (juce::roundToInt (1000 * scale), juce::roundToInt (640 * scale));
         pump (150);
         const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);

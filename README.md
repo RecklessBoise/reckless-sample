@@ -9,13 +9,15 @@ Sampler à chops **VST3 / AU / Standalone** pour macOS (et VST3 Windows) : charg
 | | |
 |---|---|
 | **8 chops** | Découpage égal ou sur les transitoires, repères déplaçables à la souris. Tap = joue le chop une fois, maintenir = boucle, **Latch** = un appui lance la boucle, un second l'arrête. |
+| **Length synchronisé** | **LENGTH SYNC** cale la durée de chaque chop sur le tempo du projet (1/64 à 2 mesures, triolets et pointées). Maintenu, le chop boucle exactement sur cette valeur de note : idéal pour les stutters en rythme. |
+| **Durée du sample** | Le knob **DURATION** raccourcit ou allonge tout le sample (×0.25 à ×4) sans changer le pitch. La durée obtenue s'affiche en secondes. |
 | **Pitch sans changer la vitesse** | Bouton **KEEP SPEED** : le pitch (±24 demi-tons + fine) passe par un time-stretch haute qualité ([Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch)). Éteint, le pitch se comporte comme un vinyle (varispeed). |
 | **Synchro BPM** | **SYNC DAW** cale le sample sur le tempo du projet en cours, **MANUAL** sur un tempo choisi. Le BPM du sample est détecté à l'import (ou lu dans le nom du fichier, ex. `loop_92bpm.wav`) et reste corrigeable (DETECT, ×2, ÷2). |
 | **321 presets d'usine** | 20 sons synthétisés (drums, keys, pads, basses, plucks, vox, textures…) × 16 styles (Dusty Tape, Cathedral, Half Time, Chipmunk, Dub Echo, Reverse Wash…). |
 | **Likes** | Clique sur le **♥** pour liker un preset. Tous tes likes sont réunis dans la banque **LIKED**. |
 | **Tes presets** | **SAVE** enregistre tes réglages (sample + chops + paramètres) dans la banque **USER**. Clic droit dans le navigateur pour renommer ou supprimer. |
-| **Taille réglable** | De 50 % à 200 % : menu en haut à droite ou coin de redimensionnement. La taille est mémorisée avec le projet. |
-| **Animations** | Le fond reprend l'esthétique de la photo de référence (lignes de points lumineux derrière un verre flou) et réagit au son : halo sur le pad joué, balayage lumineux à chaque frappe, ondulation des lignes avec le volume. |
+| **Taille réglable** | De 50 % à 200 % : menu en haut à droite ou coin de redimensionnement. Le plugin s'ouvre à 100 % (ou au zoom que tu as choisi), même dans les hôtes comme FL Studio qui réduisent la fenêtre à l'ouverture. |
+| **Animations** | Le fond reprend l'esthétique de la photo de référence (écran CRT/VHS filmé : lignes RGB verticales, lumière gris-bleu, bande magenta, bloc violet) et réagit au son : halo coloré au-dessus du pad joué, déchirure VHS à chaque frappe, couleurs qui se décalent avec le volume, bande de tracking qui défile. |
 | **Effets** | Filtre LP/BP/HP, drive, crush, chorus, delay ping-pong synchronisé, reverb. |
 
 ![Navigateur de presets](docs/screenshots/browser.png)
