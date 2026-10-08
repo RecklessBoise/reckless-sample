@@ -226,7 +226,12 @@ void PresetBrowser::showUserMenu (const PresetManager::Preset& preset)
                                                         manager.deleteUserPreset (preset);
                                                 }));
         });
-        menu.addItem (juce::String::fromUTF8 (JUCE_MAC ? "Afficher dans le Finder" : "Afficher dans l'Explorateur"), [preset] { preset.file.revealToUser(); });
+       #if JUCE_MAC
+        const auto revealLabel = "Afficher dans le Finder";
+       #else
+        const auto revealLabel = "Afficher dans l'Explorateur";
+       #endif
+        menu.addItem (revealLabel, [preset] { preset.file.revealToUser(); });
     }
     menu.showMenuAsync (juce::PopupMenu::Options());
 }
