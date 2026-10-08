@@ -1,0 +1,101 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: macOS (AU, VST3, Standalone)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Unit tests
+        run: ./build/RecklessSampleTests_artefacts/Release/RecklessSampleTests
+
+      - name: Validate the Audio Unit (auval)
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "build/RecklessSample_artefacts/Release/AU/Reckless Sample.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aumu RkSm Rckl
+
+      - name: Validate the VST3 (pluginval)
+        run: |
+          curl -L -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip
+          unzip -q pluginval.zip
+          ./pluginval.app/Contents/MacOS/pluginval --strictness-level 5 --validate-in-process \
+            "build/RecklessSample_artefacts/Release/VST3/Reckless Sample.vst3"
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cd build/RecklessSample_artefacts/Release
+          ditto -c -k --keepParent "AU/Reckless Sample.component" ../../../dist/Reckless-Sample-AU-macOS.zip
+          ditto -c -k --keepParent "VST3/Reckless Sample.vst3" ../../../dist/Reckless-Sample-VST3-macOS.zip
+          ditto -c -k --keepParent "Standalone/Reckless Sample.app" ../../../dist/Reckless-Sample-Standalone-macOS.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reckless-sample-macos
+          path: dist/*.zip
+
+  windows:
+    name: Windows (VST3, Standalone)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure
+        run: cmake -B build
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Unit tests
+        run: '& "build/RecklessSampleTests_artefacts/Release/RecklessSampleTests.exe"'
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "build/RecklessSample_artefacts/Release/VST3/Reckless Sample.vst3" -DestinationPath dist/Reckless-Sample-VST3-Windows.zip
+          Compress-Archive -Path "build/RecklessSample_artefacts/Release/Standalone/Reckless Sample.exe" -DestinationPath dist/Reckless-Sample-Standalone-Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reckless-sample-windows
+          path: dist/*.zip
+
+  release:
+    name: GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
