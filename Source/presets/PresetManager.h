@@ -19,7 +19,8 @@ struct PresetHost
     Likes and user presets are stored in the user's application data folder,
     so they are shared by every instance of the plug-in. Message thread only.
 */
-class PresetManager : public juce::ChangeBroadcaster
+class PresetManager : public juce::ChangeBroadcaster,
+                      private juce::Timer
 {
 public:
     enum class Bank { all = 0, factory, liked, user };
@@ -38,6 +39,7 @@ public:
     static juce::File defaultRootDirectory();
 
     PresetManager (juce::AudioProcessorValueTreeState& state, PresetHost& host, juce::File rootDirectory = defaultRootDirectory());
+    ~PresetManager() override;
 
     void refresh();
 
@@ -47,6 +49,9 @@ public:
     const Preset* findById (const juce::String& id) const;
 
     bool isLiked (const juce::String& id) const { return likes.contains (id); }
+
+    /** Re-reads likes and user presets if another plug-in instance changed them. */
+    void reloadIfChangedOnDisk();
     void setLiked (const juce::String& id, bool liked);
     void toggleLiked (const juce::String& id) { setLiked (id, ! isLiked (id)); }
     int getNumLiked() const { return likes.size(); }
@@ -58,10 +63,12 @@ public:
     void loadAdjacent (int delta, Bank bank);
 
     juce::Result saveUserPreset (const juce::String& name, const juce::String& category);
+    bool userPresetExists (const juce::String& name) const;
     juce::Result deleteUserPreset (const Preset& preset);
     juce::Result renameUserPreset (const Preset& preset, const juce::String& newName);
 
-    juce::String getCurrentPresetId() const { return currentId; }
+    /** Thread-safe: hosts may save the session from a background thread. */
+    juce::String getCurrentPresetId() const;
     juce::String getCurrentPresetName() const;
     void setCurrentPresetId (const juce::String& id);
 
@@ -73,8 +80,11 @@ public:
     void applyPresetState (const juce::ValueTree& preset);
 
 private:
+    void timerCallback() override { reloadIfChangedOnDisk(); }
     void loadLikes();
     void saveLikes() const;
+    juce::String diskSignature() const;
+    void setCurrentId (const juce::String& id);
     void applyFactory (const FactoryPreset& preset);
 
     juce::AudioProcessorValueTreeState& apvts;
@@ -83,5 +93,7 @@ private:
     std::vector<Preset> presets;
     juce::StringArray likes;
     juce::String currentId;
+    juce::CriticalSection idLock;
+    juce::String lastDiskSignature;
 };
 } // namespace rs

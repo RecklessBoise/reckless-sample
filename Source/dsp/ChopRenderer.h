@@ -22,6 +22,10 @@ struct RenderParams
     bool operator== (const RenderParams& other) const;
     bool operator!= (const RenderParams& other) const { return ! (*this == other); }
 
+    /** Same audio source and slicing. When only pitch / tempo / duration differ, a render
+        in progress is still worth finishing (it is close to what is wanted). */
+    bool sameSource (const RenderParams& other) const;
+
     /** Factor applied to playback speed (1 / duration x sync ratio). */
     double tempoFactor() const;
 

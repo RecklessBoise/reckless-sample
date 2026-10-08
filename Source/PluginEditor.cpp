@@ -64,16 +64,16 @@ RecklessSampleEditor::RecklessSampleEditor (RecklessSampleProcessor& p)
     browser.onClose = [this] { toggleBrowser(); };
 
     scaleButton.onClick = [this] { showScaleMenu(); };
-    scaleButton.setTooltip ("Taille de l'interface (tu peux aussi tirer le coin en bas a droite)");
+    scaleButton.setTooltip (juce::String::fromUTF8 ("Taille de l'interface (tu peux aussi tirer le coin en bas à droite)"));
 
     // Sample strip.
     prevSample.onClick = [this] { owner.stepSample (-1); };
     nextSample.onClick = [this] { owner.stepSample (1); };
     loadButton.onClick = [this] { chooseSampleFile(); };
-    prevSample.setTooltip ("Sample precedent");
+    prevSample.setTooltip (juce::String::fromUTF8 ("Sample précédent"));
     nextSample.setTooltip ("Sample suivant");
     loadButton.setTooltip ("Charger un fichier audio (ou glisse-le sur le plugin)");
-    chopMode.setTooltip ("Decoupe en 8 parts egales ou sur les transitoires");
+    chopMode.setTooltip (juce::String::fromUTF8 ("Découpe en 8 parts égales ou sur les transitoires"));
     for (auto* l : { &sampleCounter, &sampleName })
     {
         l->setColour (juce::Label::textColourId, theme::text);
@@ -88,18 +88,18 @@ RecklessSampleEditor::RecklessSampleEditor (RecklessSampleProcessor& p)
     pads.onPad = [this] (int chop, bool down) { owner.triggerPadFromUi (chop, down); };
 
     // Tooltips that explain the less obvious controls.
-    keepSpeed.setTooltip ("Allume : le pitch change sans changer la vitesse (time-stretch). Eteint : pitch facon vinyle/varispeed.");
-    syncMode.setTooltip ("Cale le sample sur le tempo : DAW = tempo du projet, MANUAL = tempo choisi a la main");
-    sampleBpm.setTooltip ("Tempo du sample (detecte a l'import). Glisse ou double-clique pour corriger.");
+    keepSpeed.setTooltip (juce::String::fromUTF8 ("Allumé : le pitch change sans changer la vitesse (time-stretch). Éteint : pitch façon vinyle/varispeed."));
+    syncMode.setTooltip (juce::String::fromUTF8 ("Cale le sample sur le tempo : DAW = tempo du projet, MANUAL = tempo choisi à la main"));
+    sampleBpm.setTooltip (juce::String::fromUTF8 ("Tempo du sample (détecté à l'import). Glisse ou double-clique pour corriger."));
     targetBpm.setTooltip ("Tempo cible en mode MANUAL (et tempo du delay hors DAW)");
-    latch.setTooltip ("Un appui lance la boucle, un second l'arrete");
-    clickFree.setTooltip ("Micro-fondus pour eviter les clics aux bords des chops");
-    length.slider.setTooltip ("Portion de chaque chop qui est jouee");
-    lengthDiv.slider.setTooltip ("Duree de chaque chop en valeur de note, calee sur le tempo du projet");
-    lengthSync.setTooltip ("Cale la duree des chops (Length) sur le tempo du projet : 1/16, 1/8, 1/4, 1 mesure...");
-    duration.slider.setTooltip ("Raccourcit ou allonge le sample sans changer le pitch (x2 = deux fois plus long)");
+    latch.setTooltip (juce::String::fromUTF8 ("Un appui lance la boucle, un second l'arrête"));
+    clickFree.setTooltip (juce::String::fromUTF8 ("Micro-fondus pour éviter les clics aux bords des chops"));
+    length.slider.setTooltip (juce::String::fromUTF8 ("Portion de chaque chop qui est jouée"));
+    lengthDiv.slider.setTooltip (juce::String::fromUTF8 ("Durée de chaque chop en valeur de note, calée sur le tempo du projet"));
+    lengthSync.setTooltip (juce::String::fromUTF8 ("Cale la durée des chops (Length) sur le tempo du projet : 1/16, 1/8, 1/4, 1 mesure…"));
+    duration.slider.setTooltip (juce::String::fromUTF8 ("Raccourcit ou allonge le sample sans changer le pitch (×2 = deux fois plus long)"));
 
-    detectButton.setTooltip ("Re-detecter le tempo du sample");
+    detectButton.setTooltip (juce::String::fromUTF8 ("Re-détecter le tempo du sample"));
     detectButton.onClick = [this] { owner.redetectBpm(); };
     doubleButton.setButtonText (juce::String::fromUTF8 ("\xc3\x97" "2"));
     halveButton.setButtonText (juce::String::fromUTF8 ("\xc3\xb7" "2"));

@@ -97,6 +97,25 @@ public:
             expectWithinAbsoluteError (shorter.getNumSamples(), source.getNumSamples() / 2, 2);
         }
 
+        beginTest ("Very short chops survive strong shortening (regression)");
+        for (float dur : { 0.5f, 0.25f })
+        {
+            for (double secs : { 0.03, 0.08, 0.15, 0.3 })
+            {
+                const auto shortSource = sine (440.0, secs, sr);
+                RenderParams p;
+                p.outputSampleRate = sr;
+                p.duration = dur;
+                p.syncMode = SyncMode::manual;
+                p.sampleBpm = 90.0;
+                p.targetBpm = 180.0; // a further x2 on top of Duration
+                const auto out = renderRegion (shortSource, 0, shortSource.getNumSamples(), sr, p);
+                const auto label = "duration " + juce::String (dur) + ", " + juce::String (secs) + " s";
+                expectWithinAbsoluteError (out.getNumSamples(), (int) std::round ((double) shortSource.getNumSamples() * dur / 2.0), 2, label);
+                expect (out.getMagnitude (0, out.getNumSamples()) > 0.1f, "audible: " + label);
+            }
+        }
+
         beginTest ("Sample-rate conversion keeps pitch");
         {
             RenderParams p;
@@ -104,6 +123,25 @@ public:
             const auto out = renderRegion (source, 0, source.getNumSamples(), sr, p);
             expectWithinAbsoluteError (out.getNumSamples(), (int) (source.getNumSamples() * 48000.0 / sr), 2);
             expectWithinAbsoluteError (dominantFrequency (out, 48000.0), 440.0, 6.0);
+        }
+
+        beginTest ("User audio survives a round trip through the session (embedded FLAC)");
+        {
+            auto original = makeSampleData (sine (330.0, 1.5, sr), sr, "my loop");
+            const auto& encoded = original->getEmbeddedAudio();
+            expect (encoded.isNotEmpty());
+            auto decoded = decodeEmbeddedAudio (encoded, "my loop");
+            expect (decoded != nullptr);
+            expectEquals (decoded->getNumSamples(), original->getNumSamples());
+            expectEquals (decoded->sampleRate, sr);
+            float maxError = 0.0f;
+            for (int i = 0; i < original->getNumSamples(); ++i)
+                maxError = juce::jmax (maxError, std::abs (decoded->audio.getSample (1, i) - original->audio.getSample (1, i)));
+            expect (maxError < 1.0e-5f, "24-bit FLAC is transparent, error " + juce::String (maxError));
+
+            auto tooLong = makeSampleData (juce::AudioBuffer<float> (2, (int) (sr * (maxEmbeddedSeconds + 1.0))), sr, "long");
+            tooLong->audio.clear();
+            expect (tooLong->getEmbeddedAudio().isEmpty(), "very long samples are not embedded");
         }
 
         beginTest ("All factory samples render eight chops");

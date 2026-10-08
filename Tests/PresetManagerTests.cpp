@@ -125,6 +125,28 @@ public:
             expectEquals (reloaded.getCurrentPresetId(), juce::String ("factory:Init"));
         }
 
+        {
+            beginTest ("Two instances never lose each other's likes (regression)");
+            DummyHost hostB;
+            PresetManager a (processor.apvts, host, root);
+            PresetManager b (processor.apvts, hostB, root);
+            a.setLiked ("factory:Lofi Keys - Clean", true);
+            b.setLiked ("factory:Glass Pad - Cathedral", true); // b's list was loaded before a's like
+            PresetManager fresh (processor.apvts, host, root);
+            expect (fresh.isLiked ("factory:Lofi Keys - Clean"), "first instance's like kept");
+            expect (fresh.isLiked ("factory:Glass Pad - Cathedral"), "second instance's like kept");
+
+            a.reloadIfChangedOnDisk();
+            expect (a.isLiked ("factory:Glass Pad - Cathedral"), "first instance sees the other's like");
+
+            beginTest ("Existing user presets are detected before overwriting");
+            expect (! a.userPresetExists ("Brand New"));
+            expect (a.saveUserPreset ("Brand New", "User").wasOk());
+            expect (b.userPresetExists ("Brand New"));
+            b.reloadIfChangedOnDisk();
+            expect (b.findById ("user:Brand New") != nullptr, "other instance lists the new preset");
+        }
+
         root.deleteRecursively();
     }
 };

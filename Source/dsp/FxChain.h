@@ -46,7 +46,11 @@ private:
     bool delayActive = false;
     float delayDamp[2] {};
 
-    juce::SmoothedValue<float> cutoffSmooth, volumeSmooth, driveSmooth, delayTimeSmooth;
+    juce::SmoothedValue<float> cutoffSmooth, volumeSmooth, driveSmooth, delayTimeSmooth, delayMixSmooth;
+
+    // Effects keep running for a moment after their mix reaches zero, so their own
+    // smoothing can fade them out instead of cutting them (and clicking).
+    int chorusHold = 0, reverbHold = 0;
     float crushHold[2] {};
     float crushCounter = 0.0f;
     float levelFollower = 0.0f;

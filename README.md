@@ -28,6 +28,7 @@ Sampler à chops **VST3 / AU / Standalone** pour macOS (et VST3 Windows) : charg
 - **MIDI** : touches blanches **C3 à C4** (Do3 Ré3 Mi3 Fa3 Sol3 La3 Si3 Do4), ou **C1 à G1** pour les pads de contrôleurs type MPC.
 - **Souris** : clique sur un pad ou directement dans la forme d'onde.
 - **Charger un sample** : glisse un fichier audio (WAV, AIFF, FLAC, MP3, OGG…) sur le plugin ou clique sur **LOAD SAMPLE**. Les flèches `<` `>` parcourent les sons d'usine, ou les autres fichiers du même dossier.
+- **Durée maximale** : 3 minutes par sample. Les samples jusqu'à 60 s sont **enregistrés dans le projet et dans tes presets** (copie FLAC sans perte) : si tu déplaces ou supprimes le fichier d'origine, ou ouvres le projet sur un autre Mac, le son est toujours là.
 
 ## Installer (macOS)
 
@@ -41,7 +42,7 @@ Sampler à chops **VST3 / AU / Standalone** pour macOS (et VST3 Windows) : charg
 xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/"Reckless Sample.component" ~/Library/Audio/Plug-Ins/VST3/"Reckless Sample.vst3"
 ```
 
-Tes presets et tes likes sont rangés dans `~/Library/Application Support/Reckless Sample/` (`Presets/*.rspreset` et `likes.json`). Ils sont partagés par tous tes projets.
+Tes presets et tes likes sont rangés dans `~/Library/Application Support/Reckless Sample/` (`Presets/*.rspreset` et `likes.json`). Ils sont partagés par tous tes projets et toutes les instances ouvertes du plugin, qui se mettent à jour entre elles.
 
 ## Compiler
 

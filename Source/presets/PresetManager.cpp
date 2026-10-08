@@ -24,6 +24,23 @@ namespace
             param->setValueNotifyingHost (param->convertTo0to1 (realValue));
     }
 
+    /** Shared by every instance in the host process, so likes are read-modified-written in turn. */
+    juce::CriticalSection& likesFileLock()
+    {
+        static juce::CriticalSection lock;
+        return lock;
+    }
+
+    /** Writes through a temporary file so a crash or another instance never sees half a file. */
+    bool writeAtomically (const juce::File& file, const juce::String& text)
+    {
+        file.getParentDirectory().createDirectory();
+        juce::TemporaryFile temp (file);
+        if (! temp.getFile().replaceWithText (text))
+            return false;
+        return temp.overwriteTargetFileWithTemporary();
+    }
+
     void resetParametersToDefault (juce::AudioProcessorValueTreeState& apvts)
     {
         for (const auto& id : allParameterIds())
@@ -47,6 +64,48 @@ PresetManager::PresetManager (juce::AudioProcessorValueTreeState& state, PresetH
     getUserPresetDirectory().createDirectory();
     loadLikes();
     refresh();
+    lastDiskSignature = diskSignature();
+    startTimer (1500);
+}
+
+PresetManager::~PresetManager()
+{
+    stopTimer();
+}
+
+juce::String PresetManager::diskSignature() const
+{
+    juce::String signature;
+    const auto likesFile = getLikesFile();
+    signature << likesFile.getLastModificationTime().toMilliseconds() << ":" << likesFile.getSize() << "|";
+    for (const auto& f : getUserPresetDirectory().findChildFiles (juce::File::findFiles, false, "*" + fileExtension))
+        signature << f.getFileName() << ":" << f.getLastModificationTime().toMilliseconds() << "|";
+    return signature;
+}
+
+void PresetManager::reloadIfChangedOnDisk()
+{
+    const auto signature = diskSignature();
+    if (signature == lastDiskSignature)
+        return;
+    lastDiskSignature = signature;
+    {
+        const juce::ScopedLock lock (likesFileLock());
+        loadLikes();
+    }
+    refresh();
+}
+
+juce::String PresetManager::getCurrentPresetId() const
+{
+    const juce::ScopedLock lock (idLock);
+    return currentId;
+}
+
+void PresetManager::setCurrentId (const juce::String& id)
+{
+    const juce::ScopedLock lock (idLock);
+    currentId = id;
 }
 
 void PresetManager::refresh()
@@ -106,13 +165,19 @@ const PresetManager::Preset* PresetManager::findById (const juce::String& id) co
 
 void PresetManager::setLiked (const juce::String& id, bool liked)
 {
-    if (liked == isLiked (id))
-        return;
-    if (liked)
-        likes.add (id);
-    else
-        likes.removeString (id);
-    saveLikes();
+    {
+        // Re-read first: another instance may have liked something since we loaded.
+        const juce::ScopedLock lock (likesFileLock());
+        loadLikes();
+        if (liked == isLiked (id))
+            return;
+        if (liked)
+            likes.add (id);
+        else
+            likes.removeString (id);
+        saveLikes();
+    }
+    lastDiskSignature = diskSignature();
     sendChangeMessage();
 }
 
@@ -130,8 +195,7 @@ void PresetManager::saveLikes() const
     juce::Array<juce::var> array;
     for (const auto& id : likes)
         array.add (id);
-    rootDir.createDirectory();
-    getLikesFile().replaceWithText (juce::JSON::toString (juce::var (array)));
+    writeAtomically (getLikesFile(), juce::JSON::toString (juce::var (array)));
 }
 
 void PresetManager::applyFactory (const FactoryPreset& preset)
@@ -197,7 +261,7 @@ bool PresetManager::loadPreset (const Preset& preset)
         applyPresetState (juce::ValueTree::fromXml (*xml));
     }
 
-    currentId = preset.id;
+    setCurrentId (preset.id);
     sendChangeMessage();
     return true;
 }
@@ -217,7 +281,7 @@ void PresetManager::loadAdjacent (int delta, Bank bank)
 
     int index = -1;
     for (size_t i = 0; i < list.size(); ++i)
-        if (list[i].id == currentId)
+        if (list[i].id == getCurrentPresetId())
             index = (int) i;
 
     const int size = (int) list.size();
@@ -240,29 +304,36 @@ juce::Result PresetManager::saveUserPreset (const juce::String& name, const juce
         return juce::Result::fail ("Impossible d'enregistrer " + file.getFullPathName());
 
     refresh();
-    currentId = userPrefix + cleanName;
+    lastDiskSignature = diskSignature();
+    setCurrentId (userPrefix + cleanName);
     sendChangeMessage();
     return juce::Result::ok();
+}
+
+bool PresetManager::userPresetExists (const juce::String& name) const
+{
+    return getUserPresetDirectory().getChildFile (juce::File::createLegalFileName (name.trim()) + fileExtension).existsAsFile();
 }
 
 juce::Result PresetManager::deleteUserPreset (const Preset& preset)
 {
     if (preset.isFactory)
-        return juce::Result::fail ("Les presets d'usine ne peuvent pas être supprimés.");
+        return juce::Result::fail (juce::String::fromUTF8 ("Les presets d'usine ne peuvent pas être supprimés."));
     if (! preset.file.deleteFile())
         return juce::Result::fail ("Impossible de supprimer " + preset.file.getFileName());
 
     setLiked (preset.id, false);
-    if (currentId == preset.id)
-        currentId.clear();
+    if (getCurrentPresetId() == preset.id)
+        setCurrentId ({});
     refresh();
+    lastDiskSignature = diskSignature();
     return juce::Result::ok();
 }
 
 juce::Result PresetManager::renameUserPreset (const Preset& preset, const juce::String& newName)
 {
     if (preset.isFactory)
-        return juce::Result::fail ("Les presets d'usine ne peuvent pas être renommés.");
+        return juce::Result::fail (juce::String::fromUTF8 ("Les presets d'usine ne peuvent pas être renommés."));
 
     const auto cleanName = juce::File::createLegalFileName (newName.trim());
     if (cleanName.isEmpty())
@@ -270,7 +341,7 @@ juce::Result PresetManager::renameUserPreset (const Preset& preset, const juce::
 
     const auto target = getUserPresetDirectory().getChildFile (cleanName + fileExtension);
     if (target.exists())
-        return juce::Result::fail ("Un preset porte déjà ce nom.");
+        return juce::Result::fail (juce::String::fromUTF8 ("Un preset porte déjà ce nom."));
 
     // Keep the name stored inside the file in sync with the file name.
     if (auto xml = juce::XmlDocument::parse (preset.file))
@@ -282,28 +353,33 @@ juce::Result PresetManager::renameUserPreset (const Preset& preset, const juce::
         return juce::Result::fail ("Impossible de renommer le preset.");
 
     const auto newId = userPrefix + cleanName;
-    if (isLiked (preset.id))
     {
-        likes.removeString (preset.id);
-        likes.add (newId);
-        saveLikes();
+        const juce::ScopedLock lock (likesFileLock());
+        loadLikes();
+        if (isLiked (preset.id))
+        {
+            likes.removeString (preset.id);
+            likes.add (newId);
+            saveLikes();
+        }
     }
-    if (currentId == preset.id)
-        currentId = newId;
+    if (getCurrentPresetId() == preset.id)
+        setCurrentId (newId);
     refresh();
+    lastDiskSignature = diskSignature();
     return juce::Result::ok();
 }
 
 juce::String PresetManager::getCurrentPresetName() const
 {
-    if (const auto* p = findById (currentId))
+    if (const auto* p = findById (getCurrentPresetId()))
         return p->name;
     return "No Preset";
 }
 
 void PresetManager::setCurrentPresetId (const juce::String& id)
 {
-    currentId = id;
+    setCurrentId (id);
     sendChangeMessage();
 }
 } // namespace rs

@@ -20,6 +20,7 @@ void FxChain::prepare (double newSampleRate, int maxBlockSize)
     volumeSmooth.reset (sampleRate, 0.03);
     driveSmooth.reset (sampleRate, 0.03);
     delayTimeSmooth.reset (sampleRate, 0.25);
+    delayMixSmooth.reset (sampleRate, 0.03);
     reset();
 }
 
@@ -34,6 +35,8 @@ void FxChain::reset()
     crushHold[0] = crushHold[1] = 0.0f;
     crushCounter = 0.0f;
     levelFollower = 0.0f;
+    chorusHold = reverbHold = 0;
+    delayMixSmooth.setCurrentAndTargetValue (0.0f);
 }
 
 void FxChain::processDelay (juce::AudioBuffer<float>& buffer, const FxSettings& s)
@@ -65,8 +68,9 @@ void FxChain::processDelay (juce::AudioBuffer<float>& buffer, const FxSettings& 
         dl[delayWrite] = 0.5f * (l[i] + r[i]) + delayDamp[0] * s.delayFeedback;
         dr[delayWrite] = delayDamp[1] * s.delayFeedback;
 
-        l[i] += wetL * s.delayMix;
-        r[i] += wetR * s.delayMix;
+        const float mix = delayMixSmooth.getNextValue();
+        l[i] += wetL * mix;
+        r[i] += wetR * mix;
         delayWrite = (delayWrite + 1) % size;
     }
 }
@@ -136,13 +140,21 @@ void FxChain::process (juce::AudioBuffer<float>& buffer, const FxSettings& s)
     juce::dsp::AudioBlock<float> block (buffer);
     juce::dsp::ProcessContextReplacing<float> context (block);
 
+    const int holdSamples = (int) (sampleRate * 0.1);
+
     if (s.chorusMix > 0.0001f)
+        chorusHold = holdSamples;
+    if (chorusHold > 0)
     {
         chorus.setMix (s.chorusMix);
         chorus.process (context);
+        chorusHold -= n;
+        if (chorusHold <= 0)
+            chorus.reset();
     }
 
-    if (s.delayMix > 0.0001f)
+    delayMixSmooth.setTargetValue (s.delayMix);
+    if (s.delayMix > 0.0001f || delayMixSmooth.isSmoothing())
     {
         processDelay (buffer, s);
         delayActive = true;
@@ -154,7 +166,10 @@ void FxChain::process (juce::AudioBuffer<float>& buffer, const FxSettings& s)
     }
 
     if (s.reverbMix > 0.0001f)
+        reverbHold = holdSamples;
+    if (reverbHold > 0)
     {
+        reverbHold -= n;
         juce::dsp::Reverb::Parameters p;
         p.roomSize = 0.3f + s.reverbSize * 0.69f;
         p.damping = 0.45f;
@@ -163,6 +178,8 @@ void FxChain::process (juce::AudioBuffer<float>& buffer, const FxSettings& s)
         p.width = 1.0f;
         reverb.setParameters (p);
         reverb.process (context);
+        if (reverbHold <= 0)
+            reverb.reset(); // faded out: drop the old tail so it can't come back later
     }
 
     volumeSmooth.setTargetValue (s.volume);

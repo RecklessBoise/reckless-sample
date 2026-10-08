@@ -54,6 +54,50 @@ SampleSource SampleSource::fromValueTree (const juce::ValueTree& v)
     return s;
 }
 
+const juce::String& SampleData::getEmbeddedAudio() const
+{
+    std::call_once (embedOnce, [this]
+    {
+        if (getLengthSeconds() > maxEmbeddedSeconds || getNumSamples() == 0)
+            return;
+
+        juce::MemoryBlock block;
+        {
+            std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::MemoryOutputStream> (block, false);
+            juce::FlacAudioFormat flac;
+            const auto options = juce::AudioFormatWriterOptions {}
+                                     .withSampleRate (std::round (sampleRate))
+                                     .withNumChannels (audio.getNumChannels())
+                                     .withBitsPerSample (24);
+            auto writer = flac.createWriterFor (stream, options);
+            if (writer == nullptr || ! writer->writeFromAudioSampleBuffer (audio, 0, getNumSamples()))
+                return;
+        } // the writer and stream flush into 'block' here
+        embedded = block.toBase64Encoding();
+    });
+    return embedded;
+}
+
+SampleData::Ptr decodeEmbeddedAudio (const juce::String& base64, const juce::String& name)
+{
+    juce::MemoryBlock block;
+    if (base64.isEmpty() || ! block.fromBase64Encoding (base64))
+        return nullptr;
+
+    juce::FlacAudioFormat flac;
+    std::unique_ptr<juce::AudioFormatReader> reader (flac.createReaderFor (new juce::MemoryInputStream (block, false), true));
+    if (reader == nullptr || reader->lengthInSamples <= 0)
+        return nullptr;
+
+    const int numSamples = (int) reader->lengthInSamples;
+    const int channels = (int) juce::jlimit (1u, 2u, reader->numChannels);
+    juce::AudioBuffer<float> audio (channels, numSamples);
+    if (! reader->read (&audio, 0, numSamples, 0, true, channels > 1))
+        return nullptr;
+
+    return makeSampleData (std::move (audio), reader->sampleRate, name);
+}
+
 juce::StringArray supportedAudioExtensions()
 {
     return juce::StringArray::fromTokens (formatManager().getWildcardForAllFormats(), ";", "");
@@ -90,7 +134,7 @@ SampleData::Ptr loadSampleFile (const juce::File& file, juce::String& error)
     const auto maxSamples = (juce::int64) (maxSampleSeconds * reader->sampleRate);
     if (reader->lengthInSamples <= 0 || reader->lengthInSamples > maxSamples)
     {
-        error = "Le sample doit durer entre 0 et " + juce::String ((int) maxSampleSeconds) + " secondes.";
+        error = juce::String::fromUTF8 ("Sample trop long : 3 minutes maximum (") + file.getFileName() + ").";
         return nullptr;
     }
 

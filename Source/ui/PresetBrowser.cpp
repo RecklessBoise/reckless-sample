@@ -6,7 +6,7 @@ namespace rs
 namespace
 {
     constexpr int heartWidth = 34;
-    const juce::String allCategories { "Toutes categories" };
+    const juce::String allCategories { juce::String::fromUTF8 ("Toutes catégories") };
 }
 
 PresetBrowser::PresetBrowser (PresetManager& m) : manager (m)
@@ -30,7 +30,7 @@ PresetBrowser::PresetBrowser (PresetManager& m) : manager (m)
     closeButton.onClick = [this] { if (onClose) onClose(); };
 
     addAndMakeVisible (search);
-    search.setTextToShowWhenEmpty ("Rechercher...", theme::textDim);
+    search.setTextToShowWhenEmpty (juce::String::fromUTF8 ("Rechercher…"), theme::textDim);
     search.setFont (theme::font (13.0f));
     search.onTextChange = [this] { rebuild(); };
 
@@ -106,9 +106,9 @@ void PresetBrowser::paint (juce::Graphics& g)
     {
         g.setColour (theme::textDim);
         g.setFont (theme::font (13.0f));
-        const auto message = bank == PresetManager::Bank::liked ? juce::String::fromUTF8 ("Aucun preset like. Clique sur \xe2\x99\xa5 pour en ajouter.")
-                           : bank == PresetManager::Bank::user  ? juce::String ("Aucun preset perso. Clique sur SAVE pour en creer.")
-                                                                : juce::String ("Aucun resultat.");
+        const auto message = bank == PresetManager::Bank::liked ? juce::String::fromUTF8 ("Aucun preset liké. Clique sur ♥ pour en ajouter.")
+                           : bank == PresetManager::Bank::user  ? juce::String::fromUTF8 ("Aucun preset perso. Clique sur SAVE pour en créer.")
+                                                                : juce::String::fromUTF8 ("Aucun résultat.");
         g.drawFittedText (message, list.getBounds().reduced (20), juce::Justification::centred, 3);
     }
 }
@@ -218,7 +218,7 @@ void PresetBrowser::showUserMenu (const PresetManager::Preset& preset)
         menu.addItem ("Supprimer", [this, preset]
         {
             juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, "Supprimer le preset",
-                                                "Supprimer \"" + preset.name + "\" ? Cette action est definitive.",
+                                                "Supprimer \"" + preset.name + juce::String::fromUTF8 ("\" ? Cette action est définitive."),
                                                 "Supprimer", "Annuler", this,
                                                 juce::ModalCallbackFunction::create ([this, preset] (int result)
                                                 {
@@ -226,7 +226,7 @@ void PresetBrowser::showUserMenu (const PresetManager::Preset& preset)
                                                         manager.deleteUserPreset (preset);
                                                 }));
         });
-        menu.addItem ("Afficher dans le Finder", [preset] { preset.file.revealToUser(); });
+        menu.addItem (juce::String::fromUTF8 (JUCE_MAC ? "Afficher dans le Finder" : "Afficher dans l'Explorateur"), [preset] { preset.file.revealToUser(); });
     }
     menu.showMenuAsync (juce::PopupMenu::Options());
 }

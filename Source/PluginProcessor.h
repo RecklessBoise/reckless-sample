@@ -7,7 +7,7 @@
 #include "dsp/FxChain.h"
 #include "dsp/SamplerEngine.h"
 #include "presets/PresetManager.h"
-#include <map>
+#include <cstring>
 #include <mutex>
 
 class RecklessSampleProcessor : public juce::AudioProcessor,
@@ -109,17 +109,29 @@ private:
     void publishRender (rs::RenderSet::Ptr set);
     void collectRetiredRenders();
     void handleMidi (const juce::MidiMessage& message, const rs::VoiceSettings& settings);
-    float param (const char* id) const { return params.at (id)->load(); }
+    /** Reads a parameter on any thread without allocating (safe on the audio thread). */
+    float param (const char* id) const;
 
-    std::map<juce::String, std::atomic<float>*> params;
+    struct ParamRef
+    {
+        const char* id = nullptr;
+        std::atomic<float>* value = nullptr;
+    };
+    std::array<ParamRef, 40> params {};
+    size_t numParams = 0;
 
     mutable std::mutex sampleMutex;
     rs::SampleData::Ptr sample;
     rs::ChopStarts chopStarts = rs::equalChops();
-    int chopsComputedForMode = 0;
+    std::atomic<int> chopsComputedForMode { 0 };
     std::atomic<int> sampleVersion { 0 };
 
     juce::MidiKeyboardState keyboardState;
+
+    // The engine and effects always run in stereo here; the result is then copied
+    // (or folded to mono) into the host's buffer.
+    juce::AudioBuffer<float> work;
+    bool lastLatch = false;
 
     std::atomic<double> currentSampleRate { 0.0 };
     std::atomic<double> hostBpm { 0.0 };

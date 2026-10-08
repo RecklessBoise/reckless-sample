@@ -15,7 +15,7 @@ jobs:
     name: macOS (AU, VST3, Standalone)
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: true
 
@@ -50,7 +50,7 @@ jobs:
           ditto -c -k --keepParent "VST3/Reckless Sample.vst3" ../../../dist/Reckless-Sample-VST3-macOS.zip
           ditto -c -k --keepParent "Standalone/Reckless Sample.app" ../../../dist/Reckless-Sample-Standalone-macOS.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: reckless-sample-macos
           path: dist/*.zip
@@ -59,7 +59,7 @@ jobs:
     name: Windows (VST3, Standalone)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: true
 
@@ -79,7 +79,7 @@ jobs:
           Compress-Archive -Path "build/RecklessSample_artefacts/Release/VST3/Reckless Sample.vst3" -DestinationPath dist/Reckless-Sample-VST3-Windows.zip
           Compress-Archive -Path "build/RecklessSample_artefacts/Release/Standalone/Reckless Sample.exe" -DestinationPath dist/Reckless-Sample-Standalone-Windows.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: reckless-sample-windows
           path: dist/*.zip
@@ -90,7 +90,7 @@ jobs:
     needs: [macos, windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: dist
           merge-multiple: true

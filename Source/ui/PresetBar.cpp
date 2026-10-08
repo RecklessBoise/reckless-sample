@@ -30,7 +30,7 @@ PresetBar::PresetBar (PresetManager& m) : manager (m)
 
     browseButton.setTooltip ("Ouvrir la banque de presets");
     likeButton.setTooltip ("Liker ce preset (banque LIKED)");
-    saveButton.setTooltip ("Enregistrer tes reglages comme preset");
+    saveButton.setTooltip (juce::String::fromUTF8 ("Enregistrer tes réglages comme preset"));
 
     browseButton.onClick = [this] { if (onToggleBrowser) onToggleBrowser(); };
     prevButton.onClick = [this] { manager.loadAdjacent (-1, getBank()); };
@@ -124,7 +124,7 @@ void PresetBar::showPresetMenu()
 void PresetBar::showSaveDialog()
 {
     saveDialog = std::make_unique<juce::AlertWindow> ("Enregistrer le preset",
-                                                      "Ton preset sera dans la banque USER. Tu pourras le liker pour le retrouver dans LIKED.",
+                                                      juce::String::fromUTF8 ("Ton preset sera dans la banque USER. Tu pourras le liker pour le retrouver dans LIKED."),
                                                       juce::MessageBoxIconType::NoIcon, this);
 
     const auto* current = manager.findById (manager.getCurrentPresetId());
@@ -133,7 +133,7 @@ void PresetBar::showSaveDialog()
     auto categories = manager.getCategories();
     categories.removeString ("Init");
     categories.addIfNotAlreadyThere ("User", 0);
-    saveDialog->addComboBox ("category", categories, "Categorie");
+    saveDialog->addComboBox ("category", categories, juce::String::fromUTF8 ("Catégorie"));
     if (auto* box = saveDialog->getComboBoxComponent ("category"))
     {
         box->setEditableText (true); // allow a new category name
@@ -152,9 +152,28 @@ void PresetBar::showSaveDialog()
             const auto name = saveDialog->getTextEditorContents ("name");
             auto* box = saveDialog->getComboBoxComponent ("category");
             const auto category = box != nullptr ? box->getText() : juce::String ("User");
-            const auto saved = manager.saveUserPreset (name, category);
-            if (saved.failed())
-                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Reckless Sample", saved.getErrorMessage(), {}, this);
+            auto save = [this, name, category]
+            {
+                const auto saved = manager.saveUserPreset (name, category);
+                if (saved.failed())
+                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Reckless Sample", saved.getErrorMessage(), {}, this);
+            };
+
+            if (manager.userPresetExists (name))
+            {
+                juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, "Remplacer le preset",
+                                                    juce::String::fromUTF8 ("Un preset \"") + name.trim() + juce::String::fromUTF8 ("\" existe déjà. Le remplacer ?"),
+                                                    "Remplacer", "Annuler", this,
+                                                    juce::ModalCallbackFunction::create ([save] (int confirmed)
+                                                    {
+                                                        if (confirmed == 1)
+                                                            save();
+                                                    }));
+            }
+            else
+            {
+                save();
+            }
         }
         saveDialog.reset();
     }), false);

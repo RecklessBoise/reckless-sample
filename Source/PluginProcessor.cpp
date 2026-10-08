@@ -14,6 +14,12 @@ const juce::Identifier chopsAttr { "chops" };
 const juce::Identifier chopModeAttr { "chopMode" };
 const juce::Identifier scaleAttr { "scale" };
 const juce::Identifier idAttr { "id" };
+const juce::Identifier embeddedAudioAttr { "audio" };
+const juce::Identifier nameAttr { "name" };
+
+// Samples up to this length are re-rendered synchronously when the sample rate changes;
+// longer ones render in the background so the host is never blocked for seconds.
+constexpr double maxSynchronousRenderSeconds = 20.0;
 
 constexpr int whiteKeyNotes[numChops] { 60, 62, 64, 65, 67, 69, 71, 72 };
 constexpr int drumPadBase = 36;
@@ -52,7 +58,10 @@ public:
             if (wanted.outputSampleRate > 0.0 && wanted.sample != nullptr && (! hasRendered || wanted != lastRendered))
             {
                 owner.rendering = true;
-                auto set = renderChops (wanted, [&] { return threadShouldExit() || owner.makeRenderParams() != wanted; });
+                // Only a new sample, new slicing or a sample-rate change cancels a render.
+                // Pitch, tempo or duration changes let it finish and then render again, so
+                // a continuously changing DAW tempo (or automation) still gets through.
+                auto set = renderChops (wanted, [&] { return threadShouldExit() || ! owner.makeRenderParams().sameSource (wanted); });
                 if (set != nullptr)
                 {
                     owner.publishRender (set);
@@ -80,7 +89,10 @@ RecklessSampleProcessor::RecklessSampleProcessor()
       apvts (*this, nullptr, "RecklessSample", createParameterLayout())
 {
     for (const auto& id : allParameterIds())
-        params[id] = apvts.getRawParameterValue (id);
+    {
+        jassert (numParams < params.size());
+        params[numParams++] = { id.toRawUTF8(), apvts.getRawParameterValue (id) };
+    }
 
     apvts.addParameterListener (ParamID::chopMode, this);
     presetManager = std::make_unique<PresetManager> (apvts, *this);
@@ -106,15 +118,24 @@ void RecklessSampleProcessor::prepareToPlay (double sampleRate, int samplesPerBl
     currentSampleRate = sampleRate;
     engine.prepare (sampleRate);
     fx.prepare (sampleRate, samplesPerBlock);
+    work.setSize (2, juce::jmax (1, samplesPerBlock));
     keyboardState.reset();
 
-    // Render synchronously when the rate changes so the first notes are in tune.
+    // When the rate changes, the old chops would play out of tune.
     if (rateChanged)
     {
         const auto renderParams = makeRenderParams();
-        if (renderParams.sample != nullptr)
+        if (renderParams.sample != nullptr && renderParams.sample->getLengthSeconds() <= maxSynchronousRenderSeconds)
+        {
+            // Short samples: render now so the first notes are already right.
             if (auto set = renderChops (renderParams))
                 publishRender (set);
+        }
+        else
+        {
+            // Long samples: stay silent until the background render arrives.
+            engine.setRenderSet (nullptr);
+        }
     }
 }
 
@@ -128,6 +149,16 @@ bool RecklessSampleProcessor::isBusesLayoutSupported (const BusesLayout& layouts
 {
     const auto out = layouts.getMainOutputChannelSet();
     return out == juce::AudioChannelSet::stereo() || out == juce::AudioChannelSet::mono();
+}
+
+float RecklessSampleProcessor::param (const char* id) const
+{
+    // A short linear scan with strcmp: no juce::String is built, so nothing allocates.
+    for (size_t i = 0; i < numParams; ++i)
+        if (std::strcmp (params[i].id, id) == 0)
+            return params[i].value->load();
+    jassertfalse; // unknown parameter ID
+    return 0.0f;
 }
 
 int RecklessSampleProcessor::noteToChop (int midiNote)
@@ -238,20 +269,44 @@ void RecklessSampleProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
 
     const auto settings = voiceSettings();
+
+    // Switching Latch on or off releases whatever is looping, so no loop is left stuck.
+    if (settings.latch != lastLatch)
+    {
+        engine.allNotesOff();
+        lastLatch = settings.latch;
+    }
+
+    // Normally pre-sized in prepareToPlay; only grows if the host sends a bigger block.
+    work.setSize (2, numSamples, false, false, true);
+    work.clear();
+
     int position = 0;
     for (const auto metadata : midi)
     {
         const int eventPos = juce::jlimit (0, numSamples, metadata.samplePosition);
         if (eventPos > position)
-            engine.render (buffer, position, eventPos - position, settings);
+            engine.render (work, position, eventPos - position, settings);
         position = eventPos;
         handleMidi (metadata.getMessage(), settings);
     }
     if (position < numSamples)
-        engine.render (buffer, position, numSamples - position, settings);
+        engine.render (work, position, numSamples - position, settings);
 
-    if (buffer.getNumChannels() > 1)
-        fx.process (buffer, fxSettings());
+    fx.process (work, fxSettings());
+
+    if (buffer.getNumChannels() >= 2)
+    {
+        buffer.copyFrom (0, 0, work, 0, 0, numSamples);
+        buffer.copyFrom (1, 0, work, 1, 0, numSamples);
+    }
+    else if (buffer.getNumChannels() == 1)
+    {
+        // Mono output: fold the stereo mix down.
+        buffer.copyFrom (0, 0, work, 0, 0, numSamples);
+        buffer.applyGain (0, 0, numSamples, 0.5f);
+        buffer.addFrom (0, 0, work, 1, 0, numSamples, 0.5f);
+    }
 }
 
 //==============================================================================
@@ -502,9 +557,19 @@ juce::ValueTree RecklessSampleProcessor::getSampleState() const
     juce::ValueTree v (sampleRefTag);
     const auto current = getSample();
     if (current != nullptr)
+    {
         v.appendChild (current->source.toValueTree(), nullptr);
+
+        // User samples travel with the session / preset, so they survive a moved or renamed file.
+        if (current->source.kind == SampleSource::Kind::file)
+        {
+            v.setProperty (nameAttr, current->name, nullptr);
+            if (const auto& audio = current->getEmbeddedAudio(); audio.isNotEmpty())
+                v.setProperty (embeddedAudioAttr, audio, nullptr);
+        }
+    }
     v.setProperty (chopsAttr, chopsToString (getChopStarts()), nullptr);
-    v.setProperty (chopModeAttr, chopsComputedForMode, nullptr);
+    v.setProperty (chopModeAttr, chopsComputedForMode.load(), nullptr);
     return v;
 }
 
@@ -522,8 +587,18 @@ void RecklessSampleProcessor::applySampleState (const juce::ValueTree& state)
     {
         juce::String error;
         data = rs::loadSampleFile (source.file, error);
+
+        if (data == nullptr && state.hasProperty (embeddedAudioAttr))
+        {
+            // The file is gone: use the copy saved with the session or preset.
+            data = decodeEmbeddedAudio (state.getProperty (embeddedAudioAttr).toString(),
+                                        state.getProperty (nameAttr, source.file.getFileNameWithoutExtension()).toString());
+            if (data != nullptr)
+                data->source = source;
+        }
+
         if (data == nullptr)
-            reportError ("Sample introuvable : " + source.file.getFullPathName());
+            reportError (juce::String::fromUTF8 ("Sample introuvable : ") + source.file.getFullPathName());
     }
 
     // The sample BPM parameter is already restored, so keep it.

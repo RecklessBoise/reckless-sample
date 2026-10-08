@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <mutex>
 #include "../Parameters.h"
 
 namespace rs
@@ -37,10 +38,25 @@ struct SampleData : juce::ReferenceCountedObject
 
     int getNumSamples() const { return audio.getNumSamples(); }
     double getLengthSeconds() const { return getNumSamples() / sampleRate; }
+
+    /** FLAC copy of the audio as base64, so sessions and presets still work if the file
+        moves. Encoded once, on first use; empty for samples longer than maxEmbeddedSeconds. */
+    const juce::String& getEmbeddedAudio() const;
+
+private:
+    mutable std::once_flag embedOnce;
+    mutable juce::String embedded;
 };
 
-/** Maximum length accepted for an imported sample, in seconds. */
-inline constexpr double maxSampleSeconds = 600.0;
+/** Maximum length accepted for an imported sample, in seconds. Longer files make every
+    pitch / tempo change slow to re-render and use a lot of memory. */
+inline constexpr double maxSampleSeconds = 180.0;
+
+/** Samples up to this length are stored inside sessions and presets (about 10 MB at most). */
+inline constexpr double maxEmbeddedSeconds = 60.0;
+
+/** Rebuilds a sample from getEmbeddedAudio(). Returns nullptr on failure. */
+SampleData::Ptr decodeEmbeddedAudio (const juce::String& base64, const juce::String& name);
 
 /** Reads an audio file into a SampleData, converting to stereo. Returns nullptr and fills error on failure. */
 SampleData::Ptr loadSampleFile (const juce::File& file, juce::String& error);
